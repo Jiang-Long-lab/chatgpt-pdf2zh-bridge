@@ -62,8 +62,7 @@ $DataDir = Join-Path $PWD '.local-data'
 powershell -NoProfile -ExecutionPolicy Bypass -File .\stop.ps1
 ```
 
-停止器核对 PID、端口和程序身份，只请求关闭这套 Node/Python 服务，不会批量结束其他程序。若正在登录、翻译或处理 PDF，请等待完成再停止。停止后登录、密钥和设置仍保留；再次双击启动入口即可使用。可以右键 VBS 创建桌面快捷方式。升级到支持停止的版本后，需要先重启旧服务。
-
+停止器核对 PID、端口和程序身份，只请求关闭这套 Node/Python 服务，不会批量结束其他程序。若正在登录、翻译或处理 PDF，请等待完成再停止。停止后登录、密钥和设置仍保留；再次双击启动入口即可使用。可以右键 VBS 创建桌面快捷方式。
 ## 用量与限制
 
 - 数据保存在 `config.local.ps1` 的 `$DataDir`。`account` 为加密凭据，`bridge.json` 包含本机密钥，`usage.jsonl` 记录数值用量。
