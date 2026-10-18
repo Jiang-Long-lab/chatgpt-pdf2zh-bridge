@@ -5,11 +5,9 @@ function Get-BridgeCandidates {
     $bases += @('Desktop','Documents','Downloads') | ForEach-Object { Join-Path $env:USERPROFILE $_ }
     $bases = @($bases | Where-Object {$_} | Select-Object -Unique)
     $nodes = @((Get-Command node.exe -ErrorAction SilentlyContinue).Source)
-    $gits = @((Get-Command git.exe -ErrorAction SilentlyContinue).Source)
     $pythons = @(); $backends = @()
     foreach ($base in $bases) {
         $nodes += Join-Path $base 'nodejs\node.exe'
-        $gits += Join-Path $base 'Git\cmd\git.exe'
         foreach ($suffix in @('zotero-pdf2zh\server','zotero-pdf2zh-main\server','server')) {
             $backends += Join-Path $base $suffix
         }
@@ -28,7 +26,6 @@ function Get-BridgeCandidates {
     }
     return @{
         Node = @($nodes | Where-Object {$_ -and (Test-Path -LiteralPath $_)} | Select-Object -Unique)
-        Git = @($gits | Where-Object {$_ -and (Test-Path -LiteralPath $_)} | Select-Object -Unique)
         Python = @($pythons | Where-Object {Test-Path -LiteralPath $_} | Select-Object -Unique)
         Backend = $backends
     }

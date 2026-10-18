@@ -22,17 +22,17 @@
 
 ## 安装
 
-需要 Windows 和已经能正常运行的 Zotero PDF2zh 后端及其 Python/Conda 环境。此安装器配置的是 **ChatGPT 桥接组件**，不会安装 Zotero 插件、PDF2zh 引擎或修复尚未安装好的翻译环境。当前启动器按 Conda 后端配置运行，其他环境管理方式未验证。
+需要 Windows、[Node.js](https://nodejs.org/) 22.12 或更高版本（含 npm），以及已经能正常运行的 Zotero PDF2zh 后端及其 Python/Conda 环境。安装时需要联网下载 SDK 和依赖。此安装器配置的是 **ChatGPT 桥接组件**，不会安装 Zotero 插件、PDF2zh 引擎或修复尚未安装好的翻译环境。当前启动器按 Conda 后端配置运行，其他环境管理方式未验证。
 
 ### 推荐：安装并启动
 
 1. 在 GitHub 点 **Code → Download ZIP**，完整解压到自己选定的文件夹；不要直接在压缩包内运行，建议避开 AppData、Program Files 和云同步目录。
 2. 双击 **`安装并启动.vbs`**。安装过程中会显示进度窗口。
-3. 程序自动查找 Node.js、Git、后端 Python 和 `server.py` 文件夹；检测到唯一位置时直接使用，不需要手动编辑路径。没有找到或有多个候选时，会弹出文件选择框，按下方说明选择。
-4. 缺少 Node.js 或 Git 时，如果电脑有 `winget`，程序会询问是否安装；输入 `y` 同意后安装。若不可用，请先自行安装 [Node.js](https://nodejs.org/)（至少 22.12，含 npm）和 [Git for Windows](https://git-scm.com/downloads/win)，再重试。
-5. 安装器下载并构建固定版本 SDK，生成本机 `config.local.ps1`，创建桌面的 **ChatGPT PDF Translation** 和 **Stop ChatGPT PDF Translation** 快捷方式，然后打开连接网页。首次仍需自己登录 ChatGPT，并完成下方 Zotero 设置。
+3. 程序自动查找 Node.js、后端 Python 和 `server.py` 文件夹；检测到唯一位置时直接使用，不需要手动编辑路径。没有找到或有多个候选时，会弹出文件选择框，按下方说明选择。
+4. 缺少 Node.js 时，如果电脑有 `winget`，程序会询问是否安装；输入 `y` 同意后安装。若不可用，请先自行安装 [Node.js](https://nodejs.org/)（至少 22.12，含 npm），再重试。
+5. 安装器下载固定版本 SDK 压缩包，校验文件后应用补丁并构建，生成本机 `config.local.ps1`，创建桌面的 **ChatGPT PDF Translation** 和 **Stop ChatGPT PDF Translation** 快捷方式，然后打开连接网页。首次仍需自己登录 ChatGPT，并完成下方 Zotero 设置。
 
-自动检测覆盖 PATH、常见安装目录、Conda 记录的 `zotero-pdf2zh-server` 环境和常见后端目录；自定义目录可能需要选择一次。重复运行会保留已有配置和登录，已应用的 SDK 补丁不会重复应用。SDK 来源版本不符或有无法识别的修改时会停止，不会删除或重置源码。下载或构建因网络失败时，按窗口提示处理后重试。
+自动检测覆盖 PATH、常见安装目录、Conda 记录的 `zotero-pdf2zh-server` 环境和常见后端目录；自定义目录可能需要选择一次。重复运行会保留已有配置和登录，已应用的 SDK 补丁不会重复应用。已有 SDK 源文件与固定版本及补丁不一致时会停止，不会删除或重置源码。下载或构建因网络失败时，按窗口提示处理后重试。
 
 以后日常使用只需双击桌面的启动快捷方式，**不必每次重新安装**。要只查看自动检测结果，可在项目目录运行：
 
@@ -75,7 +75,7 @@ $DataDir = Join-Path $PSScriptRoot '.local-data'
 
 `$DataDir` 是数据目录，保持默认即可，不算需要查找的安装路径。它会使用项目下的 `.local-data`，保存登录、密钥、设置与日志。若改成其他目录，应使用 AppData 和云同步目录之外的绝对路径，并避免提交到 Git。
 
-保存后，双击 `安装并启动.vbs` 会读取并验证配置；也可以在 Git、Node/npm 已可用的 PowerShell 中依次执行：
+保存后，双击 `安装并启动.vbs` 会读取并验证配置；也可以在 Node/npm 已可用的 PowerShell 中依次执行：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
@@ -136,7 +136,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\stop.ps1
 完成安装后运行以下命令。测试使用模拟响应，不发送真实翻译请求：
 
 ```powershell
-node --test adapter.test.mjs data-dir.test.mjs vendor/sign-in-with-chatgpt-devkit/packages/local/test/responses.test.mjs
+node --test adapter.test.mjs data-dir.test.mjs sdk-archive.test.mjs vendor/sign-in-with-chatgpt-devkit/packages/local/test/responses.test.mjs
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install-paths.test.ps1
 ```
 

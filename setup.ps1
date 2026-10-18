@@ -1,29 +1,50 @@
 $ErrorActionPreference = 'Stop'
-$sdk = Join-Path $PSScriptRoot 'vendor\sign-in-with-chatgpt-devkit'
+$vendor = Join-Path $PSScriptRoot 'vendor'
+$sdk = Join-Path $vendor 'sign-in-with-chatgpt-devkit'
 $revision = '0a36fefeb913055c8c7a1a29b63d82b96b2e841a'
-if (-not (Test-Path -LiteralPath $sdk)) {
-    New-Item -ItemType Directory -Force (Split-Path $sdk) | Out-Null
-    git clone https://github.com/openai/sign-in-with-chatgpt-devkit.git $sdk
-    if ($LASTEXITCODE -ne 0) { throw 'SDK clone failed. Check the network; no existing directory was deleted.' }
-    git -C $sdk checkout --detach $revision
-    if ($LASTEXITCODE -ne 0) { throw 'Pinned SDK checkout failed.' }
-}
-$head = git -C $sdk rev-parse HEAD
-if ($LASTEXITCODE -ne 0 -or $head -ne $revision) { throw 'Existing SDK is not the pinned revision. It was not overwritten.' }
-$patch = Join-Path $PSScriptRoot 'patches\sdk-usage-effort.patch'
-$savedPreference = $ErrorActionPreference
+$archiveHash = '3B97910855BA85D4214AC42A2E65BFE660AC3FF3475C81EB157AC27EE6F31C63'
+$stage = Join-Path $vendor ('.sdk-install-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force $stage | Out-Null
 try {
-    $ErrorActionPreference = 'Continue'
-    git -C $sdk apply --reverse --check $patch 2>$null
-    $alreadyPatched = $LASTEXITCODE -eq 0
-} finally { $ErrorActionPreference = $savedPreference }
-if (-not $alreadyPatched) {
-    git -C $sdk diff --quiet
-    if ($LASTEXITCODE -ne 0) { throw 'Existing SDK has custom or partial modifications. It was not overwritten.' }
-    git -C $sdk apply --check $patch
-    if ($LASTEXITCODE -ne 0) { throw 'SDK patch check failed.' }
-    git -C $sdk apply $patch
-    if ($LASTEXITCODE -ne 0) { throw 'SDK patch failed.' }
+    $archive = Join-Path $stage 'sdk.zip'
+    Write-Host 'Downloading pinned SDK archive...'
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -UseBasicParsing -Uri "https://codeload.github.com/openai/sign-in-with-chatgpt-devkit/zip/$revision" -OutFile $archive
+    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $archiveHash) { throw 'SDK archive checksum mismatch. Existing files were not changed.' }
+    # Strip the archive's long commit-named parent to stay within Windows PS 5.1 path limits.
+    $source = Join-Path $stage 'source'
+    New-Item -ItemType Directory $source | Out-Null
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [IO.Compression.ZipFile]::OpenRead($archive)
+    try {
+        $prefix = "sign-in-with-chatgpt-devkit-$revision/"
+        foreach ($entry in $zip.Entries) {
+            if (-not $entry.FullName.StartsWith($prefix)) { throw 'Unexpected SDK archive entry.' }
+            $relative = $entry.FullName.Substring($prefix.Length)
+            if (-not $relative) { continue }
+            $destination = [IO.Path]::GetFullPath((Join-Path $source $relative))
+            if (-not $destination.StartsWith($source + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid SDK archive path.' }
+            if ($entry.FullName.EndsWith('/')) { New-Item -ItemType Directory -Force $destination | Out-Null }
+            else {
+                New-Item -ItemType Directory -Force (Split-Path $destination) | Out-Null
+                [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destination)
+            }
+        }
+    } finally { $zip.Dispose() }
+    node.exe (Join-Path $PSScriptRoot 'sdk-archive.mjs') patch $source (Join-Path $PSScriptRoot 'patches\sdk-usage-effort.patch')
+    if ($LASTEXITCODE -ne 0) { throw 'SDK patch failed. Existing files were not changed.' }
+    if (Test-Path -LiteralPath $sdk) {
+        node.exe (Join-Path $PSScriptRoot 'sdk-archive.mjs') verify $source $sdk
+        if ($LASTEXITCODE -ne 0) { throw 'Existing SDK differs from the pinned, patched source. It was not overwritten.' }
+    } else {
+        Move-Item -LiteralPath $source -Destination $sdk
+    }
+} finally {
+    # Only remove the uniquely named staging directory created by this invocation.
+    $stageFull = [IO.Path]::GetFullPath($stage)
+    $vendorFull = [IO.Path]::GetFullPath($vendor).TrimEnd('\') + '\'
+    if (-not $stageFull.StartsWith($vendorFull, [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid SDK staging path.' }
+    if (Test-Path -LiteralPath $stageFull) { Remove-Item -LiteralPath $stageFull -Recurse -Force }
 }
 Push-Location $sdk
 try {

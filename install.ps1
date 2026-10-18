@@ -9,29 +9,25 @@ try {
     if ($existing) { . $configPath }
     $candidates = Get-BridgeCandidates $PSScriptRoot
     if ($CheckOnly) { $candidates | ConvertTo-Json -Depth 3; return }
-    foreach ($dependency in @(@{Key='Node';Id='OpenJS.NodeJS.LTS'},@{Key='Git';Id='Git.Git'})) {
-        if ($dependency.Key -eq 'Node' -and $NodePath) { continue }
-        if (-not $candidates[$dependency.Key].Count) {
-            if (-not $NonInteractive -and (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-                $answer = Read-Host "$($dependency.Key) not found. Install $($dependency.Id) using winget? [y/N]"
-                if ($answer -eq 'y') {
-                    winget.exe install --id $dependency.Id --exact --source winget --accept-package-agreements --accept-source-agreements
-                    if ($LASTEXITCODE -ne 0) { throw "$($dependency.Key) installation failed." }
-                    $env:PATH = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
-                    $candidates = Get-BridgeCandidates $PSScriptRoot
-                }
+    if (-not $NodePath -and -not $candidates.Node.Count) {
+        if (-not $NonInteractive -and (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
+            $answer = Read-Host 'Node.js not found. Install Node.js LTS using winget? [y/N]'
+            if ($answer -eq 'y') {
+                winget.exe install --id OpenJS.NodeJS.LTS --exact --source winget --accept-package-agreements --accept-source-agreements
+                if ($LASTEXITCODE -ne 0) { throw 'Node.js installation failed.' }
+                $env:PATH = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+                $candidates = Get-BridgeCandidates $PSScriptRoot
             }
         }
     }
     if (-not $NodePath) { $NodePath = Select-BridgePath 'Node.js' $candidates.Node 'node.exe' -NonInteractive:$NonInteractive }
-    $gitPath = Select-BridgePath 'Git' $candidates.Git 'git.exe' -NonInteractive:$NonInteractive
     if (-not $BackendPath) { $BackendPath = Select-BridgePath 'PDF2zh backend' $candidates.Backend 'server.py' -NonInteractive:$NonInteractive }
     if (-not $PythonPath) { $PythonPath = Select-BridgePath 'PDF2zh backend Python' $candidates.Python 'python.exe' -NonInteractive:$NonInteractive }
     $NodePath = (Get-Command $NodePath -ErrorAction Stop).Source
     $PythonPath = (Get-Command $PythonPath -ErrorAction Stop).Source
     $versionText = & $NodePath --version
     if ($LASTEXITCODE -ne 0 -or [version]($versionText.Trim().TrimStart('v')) -lt [version]'22.12.0') { throw 'Node.js 22.12 or newer is required.' }
-    $env:PATH = (Split-Path $NodePath) + ';' + (Split-Path $gitPath) + ';' + $env:PATH
+    $env:PATH = (Split-Path $NodePath) + ';' + $env:PATH
     if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) { throw 'npm.cmd is missing. Install Node.js including npm.' }
     if (-not (Test-Path -LiteralPath (Join-Path $BackendPath 'utils\task_manager.py'))) { throw 'Select the supported PDF2zh server folder, containing server.py and utils/task_manager.py.' }
     & $PythonPath -c 'import sys; sys.path.insert(0, sys.argv[1]); import server' $BackendPath
