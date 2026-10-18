@@ -13,6 +13,7 @@
 - 复用 PDF2zh 的整篇翻译、双语排版和 Zotero 附件回填。
 - 一键停止后台服务，保留登录和配置；有 PDF 任务运行时拒绝停止。
 - 网页显示论文总体进度，以及正文翻译、排版、字体处理和保存等阶段的百分比。
+- 支持普通翻译、双语对照、裁剪和裁剪对照入口的任务状态与完成记录；裁剪等未报告细分百分比的操作显示阶段名称。
 
 ## 安装
 
@@ -91,6 +92,7 @@ node --test adapter.test.mjs data-dir.test.mjs vendor/sign-in-with-chatgpt-devki
 . .\config.local.ps1
 & $PythonPath .\backend_control_test.py
 & $PythonPath .\progress_capture_test.py
+& $PythonPath .\route_tasks_test.py
 ```
 
 ## 上游与许可

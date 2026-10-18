@@ -3,6 +3,7 @@ import json
 import math
 import os
 import subprocess
+from flask import g, has_request_context
 
 
 def progress_update(event):
@@ -31,6 +32,8 @@ def install_capture(execute_module, task_manager):
     original = execute_module.execute_with_progress
     runner = os.path.join(os.path.dirname(__file__), 'pdf2zh_next_progress.py')
     def execute(cmd, task_id, args, env_manager):
+        if task_id is None and has_request_context():
+            task_id = getattr(g, 'bridge_task_id', None)
         if cmd[0] != 'pdf2zh_next' or not args.enable_venv or not env_manager:
             return original(cmd, task_id, args, env_manager)
         command, env = env_manager.get_command_and_env([runner, *cmd[1:]])
@@ -53,4 +56,6 @@ def install_capture(execute_module, task_manager):
             code = process.wait()
             if code:
                 raise subprocess.CalledProcessError(code, command)
+        if task_id:
+            task_manager.update_task(task_id, {'message': '后处理与生成文件', 'stageProgress': None})
     execute_module.execute_with_progress = execute

@@ -7,6 +7,7 @@ import json
 import threading
 from backend_control import install_control
 from progress_capture import install_capture
+from route_tasks import install_route_tasks
 
 backend = os.environ.get('PDF2ZH_BACKEND_PATH')
 if not backend or not os.path.isfile(os.path.join(backend, 'server.py')):
@@ -21,6 +22,7 @@ def local_run(self, *args, **kwargs):
         threading.Timer(0.5, lambda: os._exit(0)).start()
     from utils.task_manager import task_manager
     install_control(self, api_key, schedule_stop, task_manager)
+    install_route_tasks(self, task_manager)
     kwargs['host'] = '127.0.0.1'
     return original_run(self, *args, **kwargs)
 
