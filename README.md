@@ -82,10 +82,6 @@ $DataDir = Join-Path $PWD '.local-data'
 node --test adapter.test.mjs data-dir.test.mjs vendor/sign-in-with-chatgpt-devkit/packages/local/test/responses.test.mjs
 ```
 
-2026-10-18 发布验证：固定 SDK 下载、补丁应用、构建及 18 项离线测试通过。`npm audit --omit=dev` 为 0 项；完整开发依赖检查发现 `source-map-js` 的 1 项 high 提示。此版本保留上游锁文件以便复现，未自动升级开发依赖；安装时可重新运行 audit 查看最新结果。
-
-同日固定目录更新：增加 2 项路径测试，合计 20 项通过。现有加密凭据与配置复制到 AppData 之外后，从 Windows 桌面启动验证登录状态、模型及推理强度保留，PDF2zh 健康检查与单句真实翻译通过。
-
 ## 上游与许可
 
 SDK 来源：<https://github.com/openai/sign-in-with-chatgpt-devkit>，固定提交 `0a36fefeb913055c8c7a1a29b63d82b96b2e841a`。
