@@ -27,6 +27,16 @@ if (-not $bridgeReady) {
     $bridgeProcess = Start-Process -FilePath $NodePath -ArgumentList 'server.mjs' -WorkingDirectory $bridgeRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logDir 'bridge.log') -RedirectStandardError (Join-Path $logDir 'bridge-error.log')
     Set-Content -LiteralPath (Join-Path $logDir 'bridge.pid') -Value $bridgeProcess.Id
 }
+# The backend shutdown control needs the local key created by the bridge.
+for ($attempt=0; $attempt -lt 30; $attempt++) {
+    try {
+        $readyStatus = Invoke-RestMethod 'http://127.0.0.1:8766/status' -TimeoutSec 2
+        $bridgeReady = $readyStatus.app -eq 'zotero-pdf2zh-chatgpt-bridge' -and $readyStatus.dataDir -ieq $logDir
+        if ($bridgeReady) { break }
+    } catch {}
+    Start-Sleep -Milliseconds 500
+}
+if (-not $bridgeReady) { throw "Bridge did not become ready. Check logs in $logDir" }
 $pdfReady = $false
 try { $pdfReady = (Invoke-RestMethod 'http://127.0.0.1:8767/health' -TimeoutSec 2).status -eq 'ok' } catch {}
 if (-not $pdfReady) {

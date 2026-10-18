@@ -67,6 +67,7 @@ async function recordUsage(completion, startedAt) {
 }
 let lastTest;
 let inFlight = 0;
+let stopping = false;
 let peakInFlight = 0;
 const maxConcurrentRequests = 4;
 const client = createChatGPT({
@@ -118,6 +119,7 @@ const server = createServer(async (req, res) => {
       return json(res, 403, { error: { message: 'Local origin required.' } });
     }
     const path = new URL(req.url, origin).pathname;
+    if (stopping) return json(res,503,{error:{message:'Service is stopping.'}});
     if (req.method === 'GET' && path === '/') {
       const page = (await readFile(join(root,'index.html'),'utf8')).replaceAll('__CSRF__',csrf);
       res.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store',
@@ -132,6 +134,13 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/models') return json(res,200,{models:await models(),selected:settings.model,...effortSettings()});
     if (path.startsWith('/v1/')) {
       if (!authenticated(req.headers.authorization, settings.apiKey)) return json(res,401,{error:{message:'Invalid local API key.'}});
+      if (req.method === 'POST' && path === '/v1/shutdown') {
+        if (inFlight || loginPromise) return json(res,409,{error:{message:'Translation or login is still running. Wait for it to finish.'}});
+        stopping = true;
+        json(res,200,{status:'stopping'});
+        setTimeout(() => { server.close(); server.closeAllConnections(); },500);
+        return;
+      }
       if (req.method === 'GET' && path === '/v1/models') {
         return json(res,200,{object:'list',data:(await models()).map(m=>({id:m.slug,object:'model',owned_by:'openai'}))});
       }
@@ -188,6 +197,8 @@ const server = createServer(async (req, res) => {
       return json(res,200,effortSettings());
     }
     if (path === '/test') {
+      inFlight++;
+      try {
       const startedAt = Date.now();
       const model = await selectedModel('chatgpt-auto');
       const response = await completeChat(client,{messages:[
@@ -198,6 +209,7 @@ const server = createServer(async (req, res) => {
       completedRequests++;
       await recordUsage(response,startedAt);
       return json(res,200,lastTest);
+      } finally { inFlight--; }
     }
     return json(res,404,{error:{message:'Not found.'}});
   } catch (error) {

@@ -11,6 +11,7 @@
 - 最多 4 路翻译并发，记录服务返回的 token 用量。
 - 凭据使用 Windows 当前用户 DPAPI 加密，服务仅监听 127.0.0.1。
 - 复用 PDF2zh 的整篇翻译、双语排版和 Zotero 附件回填。
+- 一键停止后台服务，保留登录和配置；有 PDF 任务运行时拒绝停止。
 
 ## 安装
 
@@ -53,6 +54,16 @@ $DataDir = Join-Path $PWD '.local-data'
 
 4. 在 Zotero 中右键 PDF，使用 PDF2zh 翻译。关闭网页不会停止后台服务，电脑重启后需再次启动。VBS 隐藏运行；若启动失败，用 PowerShell 执行 start.ps1 查看错误。
 
+### 停止服务
+
+不用时双击 `停止ChatGPT翻译.vbs`，成功后会弹出提示；也可以在项目目录执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\stop.ps1
+```
+
+停止器核对 PID、端口和程序身份，只请求关闭这套 Node/Python 服务，不会批量结束其他程序。若正在登录、翻译或处理 PDF，请等待完成再停止。停止后登录、密钥和设置仍保留；再次双击启动入口即可使用。可以右键 VBS 创建桌面快捷方式。升级到支持停止的版本后，需要先重启旧服务。
+
 ## 用量与限制
 
 - 数据保存在 `config.local.ps1` 的 `$DataDir`。`account` 为加密凭据，`bridge.json` 包含本机密钥，`usage.jsonl` 记录数值用量。
@@ -70,6 +81,13 @@ $DataDir = Join-Path $PWD '.local-data'
 
 ```powershell
 node --test adapter.test.mjs data-dir.test.mjs vendor/sign-in-with-chatgpt-devkit/packages/local/test/responses.test.mjs
+```
+
+后端停止保护的测试使用配置中的 Python 环境（需 Flask）：
+
+```powershell
+. .\config.local.ps1
+& $PythonPath .\backend_control_test.py
 ```
 
 ## 上游与许可
