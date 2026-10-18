@@ -48,7 +48,6 @@ notepad .\config.local.ps1
 | API Key | 上述本机连接密钥（不是 OpenAI Platform API Key） |
 | Worker / QPS | `4` / `2` |
 | JSON mode | 关闭 |
-| 输出 | 勾选 mono 和 dual；按需选择左右对照 |
 
 4. 在 Zotero 中右键 PDF，使用 PDF2zh 翻译。关闭网页不会停止后台服务，电脑重启后需再次启动。VBS 隐藏运行；若启动失败，用 PowerShell 执行 start.ps1 查看错误。
 
