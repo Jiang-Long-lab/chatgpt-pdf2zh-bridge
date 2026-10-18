@@ -1,0 +1,131 @@
+--- a/packages/local/src/responses.ts
++++ b/packages/local/src/responses.ts
+@@ -1,12 +1,14 @@
++// Modified by Jiang-Long-lab, 2026-10-18: preserve response usage and support reasoning effort; associated tests.
++// Modifications licensed under the Sign-in with ChatGPT DevKit Noncommercial License.
+ import OpenAI from "openai";
+ import { apiError, ChatGPTError, isObject } from "./errors.js";
+-import type { StreamResponseOptions } from "./types.js";
++import type { StreamResponseOptions, StreamResponseResult, ResponseUsage } from "./types.js";
+ 
+ export async function streamResponse(
+   accessToken: string,
+   options: StreamResponseOptions,
+   signal: AbortSignal,
+-): Promise<{ text: string }> {
++): Promise<StreamResponseResult> {
+   const input = typeof options.input === "string" ? [{ role: "user" as const, content: options.input }] : options.input;
+   if (!Array.isArray(input) || input.some((message) =>
+     !isObject(message) || !["user", "assistant", "developer"].includes(String(message.role)) || typeof message.content !== "string"
+@@ -40,6 +42,7 @@
+   try {
+     const result = await client.responses.create({
+       model: options.model,
++      ...(options.reasoningEffort !== undefined ? { reasoning: { effort: options.reasoningEffort } } : {}),
+       input: input.map((message) => ({ role: message.role, content: message.content })),
+       ...(options.instructions !== undefined ? { instructions: options.instructions } : {}),
+       store: false,
+@@ -56,6 +59,7 @@
+ 
+     let completed = false;
+     let text = "";
++    let usage: ResponseUsage | undefined;
+     for await (const event of result.data) {
+       requestSignal.throwIfAborted();
+       if (!isObject(event)) continue;
+@@ -69,6 +73,16 @@
+       } else if (event.type === "response.incomplete") {
+         throw new ChatGPTError("response_incomplete", "ChatGPT stopped before completing the response. You can keep the partial text or try again.", true);
+       } else if (event.type === "response.completed") {
++        const reported = event.response?.usage;
++        if (reported && [reported.input_tokens, reported.output_tokens, reported.total_tokens].every(value => Number.isSafeInteger(value) && value >= 0)) {
++          usage = {
++            input_tokens: reported.input_tokens,
++            output_tokens: reported.output_tokens,
++            total_tokens: reported.total_tokens,
++            ...(Number.isSafeInteger(reported.input_tokens_details?.cached_tokens) ? { input_tokens_details: { cached_tokens: reported.input_tokens_details.cached_tokens } } : {}),
++            ...(Number.isSafeInteger(reported.output_tokens_details?.reasoning_tokens) ? { output_tokens_details: { reasoning_tokens: reported.output_tokens_details.reasoning_tokens } } : {}),
++          };
++        }
+         completed = true;
+         break;
+       }
+@@ -76,7 +90,7 @@
+     // The SDK may finish iteration on an aborted connection without throwing.
+     requestSignal.throwIfAborted();
+     if (!completed) throw new ChatGPTError("stream_interrupted", "The response ended before completion. You can keep the partial text or try again.", true);
+-    return { text };
++    return { text, ...(usage ? { usage } : {}) };
+   } catch (error) {
+     if (signal.aborted) throw new ChatGPTError("cancelled", "The response was cancelled.");
+     if (error instanceof ChatGPTError) throw error;
+--- a/packages/local/src/types.ts
++++ b/packages/local/src/types.ts
+@@ -1,3 +1,5 @@
++// Modified by Jiang-Long-lab, 2026-10-18: preserve response usage and support reasoning effort; associated tests.
++// Modifications licensed under the Sign-in with ChatGPT DevKit Noncommercial License.
+ export interface SessionIdentity {
+   name?: string;
+   email?: string;
+@@ -74,10 +76,25 @@
+ 
+ export interface StreamResponseOptions {
+   model: string;
++  reasoningEffort?: "none" | "low" | "medium" | "high" | "xhigh" | "max";
+   input: string | ResponseInputMessage[];
+   instructions?: string;
+   signal?: AbortSignal;
+   onDelta?: (delta: string) => void;
++}
++
++// Local bridge extension: preserve server-reported usage for translation measurement.
++export interface ResponseUsage {
++  input_tokens: number;
++  output_tokens: number;
++  total_tokens: number;
++  input_tokens_details?: { cached_tokens: number };
++  output_tokens_details?: { reasoning_tokens: number };
++}
++
++export interface StreamResponseResult {
++  text: string;
++  usage?: ResponseUsage;
+ }
+ 
+ export interface SignInOptions {
+@@ -100,7 +117,7 @@
+   subscribe(listener: (session: SessionState) => void): () => void;
+   /** Sign out of the selected profile. Its registration and identity remain saved. */
+   disconnect(): Promise<void>;
+-  streamResponse(options: StreamResponseOptions): Promise<{ text: string }>;
++  streamResponse(options: StreamResponseOptions): Promise<StreamResponseResult>;
+ }
+ 
+ export interface StoredCredentials {
+--- a/packages/local/test/responses.test.mjs
++++ b/packages/local/test/responses.test.mjs
+@@ -1,10 +1,24 @@
++// Modified by Jiang-Long-lab, 2026-10-18: preserve response usage and support reasoning effort; associated tests.
++// Modifications licensed under the Sign-in with ChatGPT DevKit Noncommercial License.
+ import assert from 'node:assert/strict';
+ import test from 'node:test';
+ import { streamResponse } from '../dist/responses.js';
+ 
+ const delta = (text) => ({ type: 'response.output_text.delta', delta: text });
+ const completed = { type: 'response.completed', response: { status: 'completed' } };
++test('explicit reasoning effort is serialized in the Responses request',async(t)=>{
++  t.mock.method(globalThis,'fetch',async(_url,init)=>{
++    assert.deepEqual(JSON.parse(init.body).reasoning,{effort:'low'});
++    return sse(frame(delta('answer'))+frame(completed));
++  });
++  assert.deepEqual(await request({reasoningEffort:'low'}),{text:'answer'});
++});
+ const frame = (event) => `data: ${JSON.stringify(event)}\r\n\r\n`;
++test('retains completed response usage without inventing missing measurements',async(t)=>{
++  const usage={input_tokens:100,output_tokens:20,total_tokens:120,input_tokens_details:{cached_tokens:64},output_tokens_details:{reasoning_tokens:5}};
++  t.mock.method(globalThis,'fetch',async()=>sse(frame(delta('answer'))+frame({type:'response.completed',response:{status:'completed',usage}})));
++  assert.deepEqual(await request(),{text:'answer',usage});
++});
+ const request = (options = {}, signal = new AbortController().signal) =>
+   streamResponse('synthetic-oauth-token', { model: 'test-model', input: 'private clipboard text', ...options }, signal);
+ 

@@ -1,0 +1,15 @@
+vendor/
+node_modules/
+config.local.ps1
+*.log
+*.pid
+*.jsonl
+.env*
+bridge.json
+chatgpt-auth.json
+account/
+__pycache__/
+*.pdf
+*.png
+output/
+tmp/
