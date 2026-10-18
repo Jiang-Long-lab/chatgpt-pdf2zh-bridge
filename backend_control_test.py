@@ -5,6 +5,21 @@ from backend_control import install_control
 
 
 class ShutdownTests(unittest.TestCase):
+    def test_progress_is_authenticated_and_excludes_configuration(self):
+        class Tasks:
+            def get_active_tasks_list(self):
+                return [{'taskId': 'test', 'fileName': 'test.pdf', 'progress': 65,
+                         'config': {'secret': 'must-not-leak'}, 'stages': [{'name': 'Typesetting', 'percent': 25}]}]
+            def get_history(self):
+                return [{'fileName': 'old.pdf', 'status': 'success', 'config': {'secret': 'must-not-leak'}}]
+        app = Flask(__name__)
+        install_control(app, 'test-key', lambda: None, Tasks())
+        client = app.test_client()
+        self.assertEqual(client.get('/bridge/progress').status_code, 401)
+        response = client.get('/bridge/progress', headers={'Authorization': 'Bearer test-key'})
+        self.assertEqual(response.json['tasks'][0]['stages'][0]['percent'], 25)
+        self.assertNotIn('secret', response.text)
+
     def test_authentication_and_repeat_shutdown(self):
         app = Flask(__name__)
         stopped = []

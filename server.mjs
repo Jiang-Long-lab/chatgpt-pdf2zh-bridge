@@ -132,6 +132,13 @@ const server = createServer(async (req, res) => {
         completedRequests,usageTotals,inFlight,peakInFlight,maxConcurrentRequests,lastTest,loginError,loginExpiresAt:loginPromise ? loginStartedAt + 600000 : null });
     }
     if (req.method === 'GET' && path === '/models') return json(res,200,{models:await models(),selected:settings.model,...effortSettings()});
+    if (req.method === 'GET' && path === '/progress') {
+      try {
+        const upstream = await fetch('http://127.0.0.1:8767/bridge/progress', {headers:{Authorization:`Bearer ${settings.apiKey}`},signal:AbortSignal.timeout(2500)});
+        if (!upstream.ok) throw new Error('Backend progress unavailable.');
+        return json(res,200,{available:true,...await upstream.json()});
+      } catch { return json(res,200,{available:false,tasks:[],history:[]}); }
+    }
     if (path.startsWith('/v1/')) {
       if (!authenticated(req.headers.authorization, settings.apiKey)) return json(res,401,{error:{message:'Invalid local API key.'}});
       if (req.method === 'POST' && path === '/v1/shutdown') {
@@ -168,6 +175,15 @@ const server = createServer(async (req, res) => {
     }
     if (req.method !== 'POST') return json(res,404,{error:{message:'Not found.'}});
     if (req.headers['x-csrf-token'] !== csrf) return json(res,403,{error:{message:'Reopen the local connection page.'}});
+    if (path === '/shutdown') {
+      if (inFlight || loginPromise) return json(res,409,{error:{message:'正在翻译或登录，请等待完成后再停止。'}});
+      const upstream = await fetch('http://127.0.0.1:8767/bridge/shutdown', {method:'POST',headers:{Authorization:`Bearer ${settings.apiKey}`},signal:AbortSignal.timeout(5000)});
+      if (!upstream.ok) return json(res,upstream.status,{error:{message:upstream.status===409?'PDF 正在处理（含解析、翻译或排版），请完成后再停止。':'后端未能停止，请使用停止快捷方式检查。'}});
+      stopping = true;
+      json(res,200,{status:'stopping'});
+      setTimeout(() => { server.close(); server.closeAllConnections(); },500);
+      return;
+    }
     if (path === '/login') {
       if (!loginPromise) {
         loginError = undefined; authorizationUrl = undefined;

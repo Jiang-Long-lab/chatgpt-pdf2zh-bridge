@@ -6,6 +6,7 @@ import flask
 import json
 import threading
 from backend_control import install_control
+from progress_capture import install_capture
 
 backend = os.environ.get('PDF2ZH_BACKEND_PATH')
 if not backend or not os.path.isfile(os.path.join(backend, 'server.py')):
@@ -18,12 +19,16 @@ def local_run(self, *args, **kwargs):
         api_key = json.load(settings_file)['apiKey']
     def schedule_stop():
         threading.Timer(0.5, lambda: os._exit(0)).start()
-    install_control(self, api_key, schedule_stop)
+    from utils.task_manager import task_manager
+    install_control(self, api_key, schedule_stop, task_manager)
     kwargs['host'] = '127.0.0.1'
     return original_run(self, *args, **kwargs)
 
 flask.Flask.run = local_run
 sys.path.insert(0, backend)
+from utils import execute
+from utils.task_manager import task_manager
+install_capture(execute, task_manager)
 os.chdir(backend)
 sys.argv = [os.path.join(backend, 'server.py'), '--port', '8767', '--env_tool', 'conda', '--skip_install', 'True', '--check_update', 'False']
 runpy.run_path(sys.argv[0], run_name='__main__')

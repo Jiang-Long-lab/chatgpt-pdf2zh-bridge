@@ -4,9 +4,19 @@ import threading
 from flask import g, jsonify, request
 
 
-def install_control(app, api_key, on_stop):
+def install_control(app, api_key, on_stop, task_manager=None):
     lock = threading.Lock()
     state = {'active': 0, 'stopping': False}
+
+    @app.get('/bridge/progress')
+    def progress():
+        if not hmac.compare_digest(request.headers.get('Authorization', ''), 'Bearer ' + api_key):
+            return jsonify(error='Invalid local key.'), 401
+        tasks = task_manager.get_active_tasks_list() if task_manager else []
+        history = task_manager.get_history()[:3] if task_manager else []
+        fields = ('taskId', 'fileName', 'active', 'progress', 'progressKnown', 'status', 'message', 'stageProgress', 'stageCurrent', 'stageTotal', 'partIndex', 'totalParts', 'stages')
+        return jsonify(tasks=[{k: t[k] for k in fields if k in t} for t in tasks],
+                       history=[{k: t[k] for k in ('fileName', 'status', 'endTime') if k in t} for t in history])
 
     @app.before_request
     def track_work():

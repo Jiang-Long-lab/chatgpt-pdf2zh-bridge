@@ -12,6 +12,7 @@
 - 凭据使用 Windows 当前用户 DPAPI 加密，服务仅监听 127.0.0.1。
 - 复用 PDF2zh 的整篇翻译、双语排版和 Zotero 附件回填。
 - 一键停止后台服务，保留登录和配置；有 PDF 任务运行时拒绝停止。
+- 网页显示论文总体进度，以及正文翻译、排版、字体处理和保存等阶段的百分比。
 
 ## 安装
 
@@ -56,7 +57,7 @@ $DataDir = Join-Path $PWD '.local-data'
 
 ### 停止服务
 
-不用时双击 `停止ChatGPT翻译.vbs`，成功后会弹出提示；也可以在项目目录执行：
+不用时点击连接网页中的 **停止翻译服务**。成功后页面显示“服务已停止”，并停止轮询；再次使用请双击启动快捷方式，再刷新网页。也可以双击 `停止ChatGPT翻译.vbs`，或在项目目录执行：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\stop.ps1
@@ -65,6 +66,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\stop.ps1
 停止器核对 PID、端口和程序身份，只请求关闭这套 Node/Python 服务，不会批量结束其他程序。若正在登录、翻译或处理 PDF，请等待完成再停止。停止后登录、密钥和设置仍保留；再次双击启动入口即可使用。可以右键 VBS 创建桌面快捷方式。
 ## 用量与限制
 
+- 网页每 2 秒读取一次本地进度，不调用模型，不额外消耗 token。进度来自 pdf2zh_next 引擎的结构化事件，适用于通过后端 Python/虚拟环境运行的方式；其他引擎或独立 EXE 没有报告准确进度时，页面显示等待上报或阶段名称。
+- 总体百分比是引擎估算的工作量进度，不是剩余时间。阶段百分比独立计算；分批处理时会标明当前部分，最终文件生成成功后才显示总体 100%。
 - 数据保存在 `config.local.ps1` 的 `$DataDir`。`account` 为加密凭据，`bridge.json` 包含本机密钥，`usage.jsonl` 记录数值用量。
 - 启动器通过 `ZOTERO_CHATGPT_DATA_DIR` 将同一个绝对路径传给服务，日志与 PID 也写在此处。直接运行 `node server.mjs` 时，需自行设置此变量，否则使用该代码目录下的 `.local-data`。`GET /status` 的 `dataDir` 可核对实际路径。
 - `/status` 的统计从本次启动起累计。token 数不等同于订阅额度百分比；账号额度还可能被其他会话消耗。用量与授权可在 <https://chatgpt.com/settings/usage> 管理。
@@ -87,6 +90,7 @@ node --test adapter.test.mjs data-dir.test.mjs vendor/sign-in-with-chatgpt-devki
 ```powershell
 . .\config.local.ps1
 & $PythonPath .\backend_control_test.py
+& $PythonPath .\progress_capture_test.py
 ```
 
 ## 上游与许可
