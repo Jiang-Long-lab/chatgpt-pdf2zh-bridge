@@ -13,3 +13,4 @@ __pycache__/
 *.png
 output/
 tmp/
+.local-data/

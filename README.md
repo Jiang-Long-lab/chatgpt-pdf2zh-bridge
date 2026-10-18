@@ -24,7 +24,7 @@ Copy-Item .\config.example.ps1 .\config.local.ps1
 notepad .\config.local.ps1
 ```
 
-在配置文件中填写 Node、后端 Python 和包含 `server.py` 的后端目录。Python 必须是后端已配置好的环境，且包含 Flask。后端自身的翻译环境也需要可用。本项目不会自动安装或更新 PDF2zh。
+在配置文件中填写 Node、后端 Python 和包含 `server.py` 的后端目录。`$DataDir` 是固定数据目录，默认为安装目录下的 `.local-data`；可改成其他绝对路径，请选在 AppData 和云同步目录之外。Python 必须是后端已配置好的环境，且包含 Flask。后端自身的翻译环境也需要可用。本项目不会自动安装或更新 PDF2zh。
 
 `setup.ps1` 下载固定版本 SDK、应用本项目补丁并构建。已有 vendor 目录时脚本会停止，避免覆盖本地修改；安装失败后请先检查错误和目录内容再决定是否重建。
 
@@ -35,7 +35,9 @@ notepad .\config.local.ps1
 3. 在 Zotero PDF2zh 设置中填写下表。首次启动会自动生成本机连接密钥，请在本机 PowerShell 中读取后粘贴到插件，不要发到公开网页或 issue：
 
 ```powershell
-(Get-Content "$env:LOCALAPPDATA\ZoteroChatGPTBridge\bridge.json" -Raw | ConvertFrom-Json).apiKey
+$DataDir = Join-Path $PWD '.local-data'
+. .\config.local.ps1
+(Get-Content (Join-Path $DataDir 'bridge.json') -Raw | ConvertFrom-Json).apiKey
 ```
 
 | 配置项 | 值 |
@@ -54,7 +56,8 @@ notepad .\config.local.ps1
 
 ## 用量与限制
 
-- 数据保存在 `%LOCALAPPDATA%\ZoteroChatGPTBridge`，不要上传该目录。`account` 为加密凭据，`bridge.json` 包含本机密钥，`usage.jsonl` 记录数值用量。
+- 数据保存在 `config.local.ps1` 的 `$DataDir`，不要上传该目录。`account` 为加密凭据，`bridge.json` 包含本机密钥，`usage.jsonl` 记录数值用量。配置文件和默认 `.local-data` 均被 Git 忽略；自定义目录请放在仓库之外。
+- 启动器通过 `ZOTERO_CHATGPT_DATA_DIR` 将同一个绝对路径传给服务，日志与 PID 也写在此处。直接运行 `node server.mjs` 时，需自行设置此变量，否则使用该代码目录下的 `.local-data`。`GET /status` 的 `dataDir` 可核对实际路径；如果端口上已有旧目录的桥接服务，启动器会报错而不是误用旧服务。
 - `/status` 的统计从本次启动起累计。token 数不等同于订阅额度百分比；账号额度还可能被其他会话消耗。用量与授权可在 <https://chatgpt.com/settings/usage> 管理。
 - 默认首次配置是 GPT-6.1 Sol / 默认强度；可在网页中改为账号可用的 Luna / 低。账号没有该模型时请选择目录中的模型。设置只影响后续请求，翻译期间请勿切换。
 - `chatgpt-auto` 是固定别名：切换实际模型或强度后，PDF2zh 可能复用旧缓存。严格对比时需要在后端启用 `ignore_cache`；正常使用后可恢复缓存。
@@ -62,15 +65,27 @@ notepad .\config.local.ps1
 - 排版由 PDF2zh 处理，复杂图注、表头、参考文献可能出现断字或重叠。此桥接器不修复排版。
 - 仅支持非流式的文本 Chat Completions 输入，不是通用 OpenAI API 代理。SDK 在上游仍使用流式响应。
 
+## 从旧版 AppData 目录迁移
+
+旧版使用 `%LOCALAPPDATA%\ZoteroChatGPTBridge`。从 MSIX 打包应用（例如 Codex）启动时，Windows 可能把写入重定向到 `%LOCALAPPDATA%\Packages\<应用包名>\LocalCache\Local\ZoteroChatGPTBridge`，而普通资源管理器看到的原目录为空。这不是文件隐藏。
+
+1. 确认没有正在翻译的任务，然后停止这套桥接服务及其 PDF2zh 后端，不要批量结束其他 Node/Python 程序。
+2. 找到真正含有 `bridge.json` 和 `account` 的旧目录。复制完整 `account` 文件夹、`bridge.json`、`usage.jsonl` 和需要保留的日志到新的固定目录，保留原目录备份。不要迁移旧 `.pid` 文件，也不要覆盖已有的新配置。
+3. 在 `config.local.ps1` 设置 `$DataDir` 为新目录的绝对路径，再从桌面启动。确认 `/status` 中 `dataDir` 正确、登录为 connected、模型与强度未变，再做一句翻译测试。
+
+复制须在同一台电脑、同一 Windows 用户下进行，保持加密凭据原样；DPAPI 凭据不能保证跨用户或跨电脑使用。迁移不会修改 Zotero 内的本机密钥，只有完整保留 `bridge.json` 才能继续使用原插件配置。旧版安装器不提供自动迁移，避免在多个登录目录之间误选或覆盖。
+
 ## 离线测试
 
 完成安装后运行以下命令。测试使用模拟响应，不发送真实翻译请求：
 
 ```powershell
-node --test adapter.test.mjs vendor/sign-in-with-chatgpt-devkit/packages/local/test/responses.test.mjs
+node --test adapter.test.mjs data-dir.test.mjs vendor/sign-in-with-chatgpt-devkit/packages/local/test/responses.test.mjs
 ```
 
 2026-10-18 发布验证：固定 SDK 下载、补丁应用、构建及 18 项离线测试通过。`npm audit --omit=dev` 为 0 项；完整开发依赖检查发现 `source-map-js` 的 1 项 high 提示。此版本保留上游锁文件以便复现，未自动升级开发依赖；安装时可重新运行 audit 查看最新结果。
+
+同日固定目录更新：增加 2 项路径测试，合计 20 项通过。现有加密凭据与配置复制到 AppData 之外后，从 Windows 桌面启动验证登录状态、模型及推理强度保留，PDF2zh 健康检查与单句真实翻译通过。
 
 ## 上游与许可
 

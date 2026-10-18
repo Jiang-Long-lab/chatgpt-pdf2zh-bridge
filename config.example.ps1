@@ -2,3 +2,5 @@
 $NodePath = 'node.exe'
 $PythonPath = 'C:\tools\miniconda3\envs\zotero-pdf2zh-server\python.exe'
 $BackendPath = 'C:\tools\zotero-pdf2zh\server'
+# Absolute path outside AppData; keep this directory private and out of Git.
+$DataDir = Join-Path $PSScriptRoot '.local-data'

@@ -6,9 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createChatGPT } from './vendor/sign-in-with-chatgpt-devkit/packages/local/dist/index.js';
 import { authenticated, completeChat, supportedEfforts } from './adapter.mjs';
+import { resolveDataDir } from './data-dir.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
-const dataDir = join(process.env.LOCALAPPDATA, 'ZoteroChatGPTBridge');
+const dataDir = resolveDataDir(root);
 await mkdir(dataDir, { recursive: true });
 const settingsPath = join(dataDir, 'bridge.json');
 let settings;
@@ -125,7 +126,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'GET' && path === '/status') {
       const session = await client.getSession();
-      return json(res,200,{ app:'zotero-pdf2zh-chatgpt-bridge',session,model:settings.model,
+      return json(res,200,{ app:'zotero-pdf2zh-chatgpt-bridge',dataDir,session,model:settings.model,
         completedRequests,usageTotals,inFlight,peakInFlight,maxConcurrentRequests,lastTest,loginError,loginExpiresAt:loginPromise ? loginStartedAt + 600000 : null });
     }
     if (req.method === 'GET' && path === '/models') return json(res,200,{models:await models(),selected:settings.model,...effortSettings()});
