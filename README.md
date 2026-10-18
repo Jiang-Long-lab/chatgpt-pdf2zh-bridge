@@ -7,6 +7,7 @@
 ## 功能
 
 - 本地网页登录、选择模型和推理强度，设置自动保存。
+- 安装并启动向导自动检测常见安装路径，生成本机配置和桌面快捷方式。
 - 将文本 Chat Completions 请求转换为 SDK Responses 请求。
 - 最多 4 路翻译并发，记录服务返回的 token 用量。
 - 凭据使用 Windows 当前用户 DPAPI 加密，服务仅监听 127.0.0.1。
@@ -21,19 +22,67 @@
 
 ## 安装
 
-需要 Windows、Git、Node.js >= 22.12（含 npm），以及已经安装好的 Zotero PDF2zh 后端与 Python/Conda 环境。已测试 Zotero 10、PDF2zh 插件 4.1.7、后端 4.0.4，翻译引擎为 pdf2zh_next。其他版本兼容性未验证。
+需要 Windows 和已经能正常运行的 Zotero PDF2zh 后端及其 Python/Conda 环境。此安装器配置的是 **ChatGPT 桥接组件**，不会安装 Zotero 插件、PDF2zh 引擎或修复尚未安装好的翻译环境。当前启动器按 Conda 后端配置运行，其他环境管理方式未验证。
+
+### 推荐：安装并启动
+
+1. 在 GitHub 点 **Code → Download ZIP**，完整解压到自己选定的文件夹；不要直接在压缩包内运行，建议避开 AppData、Program Files 和云同步目录。
+2. 双击 **`安装并启动.vbs`**。安装过程中会显示进度窗口。
+3. 程序自动查找 Node.js、Git、后端 Python 和 `server.py` 文件夹；检测到唯一位置时直接使用，不需要手动编辑路径。没有找到或有多个候选时，会弹出文件选择框，按下方说明选择。
+4. 缺少 Node.js 或 Git 时，如果电脑有 `winget`，程序会询问是否安装；输入 `y` 同意后安装。若不可用，请先自行安装 [Node.js](https://nodejs.org/)（至少 22.12，含 npm）和 [Git for Windows](https://git-scm.com/downloads/win)，再重试。
+5. 安装器下载并构建固定版本 SDK，生成本机 `config.local.ps1`，创建桌面的 **ChatGPT PDF Translation** 和 **Stop ChatGPT PDF Translation** 快捷方式，然后打开连接网页。首次仍需自己登录 ChatGPT，并完成下方 Zotero 设置。
+
+自动检测覆盖 PATH、常见安装目录、Conda 记录的 `zotero-pdf2zh-server` 环境和常见后端目录；自定义目录可能需要选择一次。重复运行会保留已有配置和登录，已应用的 SDK 补丁不会重复应用。SDK 来源版本不符或有无法识别的修改时会停止，不会删除或重置源码。下载或构建因网络失败时，按窗口提示处理后重试。
+
+以后日常使用只需双击桌面的启动快捷方式，**不必每次重新安装**。要只查看自动检测结果，可在项目目录运行：
 
 ```powershell
-git clone https://github.com/Jiang-Long-lab/chatgpt-pdf2zh-bridge.git
-cd chatgpt-pdf2zh-bridge
-powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
-Copy-Item .\config.example.ps1 .\config.local.ps1
-notepad .\config.local.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -CheckOnly
 ```
 
-在配置文件中填写 Node、后端 Python 和包含 `server.py` 的后端目录。`$DataDir` 是固定数据目录，默认为安装目录下的 `.local-data`；可改成其他绝对路径，请选在 AppData 和云同步目录之外。Python 必须是后端已配置好的环境，且包含 Flask。后端自身的翻译环境也需要可用。本项目不会自动安装或更新 PDF2zh。
+### 手动配置：三个路径怎么找
 
-`setup.ps1` 下载固定版本 SDK、应用本项目补丁并构建。已有 vendor 目录时脚本会停止，避免覆盖本地修改；安装失败后请先检查错误和目录内容再决定是否重建。
+如果希望手动填写，先把项目中的 `config.example.ps1` **复制一份**，重命名为 `config.local.ps1`，用记事本打开。已有 `config.local.ps1` 时直接编辑，不要用模板覆盖。
+
+| 变量 | 填什么 | 怎么找到 |
+| --- | --- | --- |
+| `$NodePath` | `node.exe` 的完整文件路径 | 在 PowerShell 中运行 `where.exe node`；常见结果为 `C:\Program Files\nodejs\node.exe`。没有结果时，查看 Node 安装目录或先安装 Node。 |
+| `$PythonPath` | **运行 PDF2zh 后端的环境**中的 `python.exe` | 运行 `conda env list` 找到后端环境的位置，通常名称为 `zotero-pdf2zh-server`，再在环境目录中找到 `python.exe`。也可以在已激活后端环境的终端运行下方命令。不要随意选系统 Python 或只装了翻译引擎的环境。 |
+| `$BackendPath` | 包含 `server.py` 的**文件夹** | 找到原来安装的 Zotero PDF2zh 后端，通常是 `zotero-pdf2zh\server`，里面应同时有 `server.py`、`utils` 和 `config`。也可以用记事本查看原后端启动脚本中的目录。此项不能填 `server.py` 文件本身。 |
+
+在原本运行 PDF2zh 后端的 Python 环境中查询解释器路径：
+
+```powershell
+python -c "import sys; print(sys.executable)"
+```
+
+如果后端 Conda 环境名称正好是 `zotero-pdf2zh-server`，也可以直接运行：
+
+```powershell
+conda run -n zotero-pdf2zh-server python -c "import sys; print(sys.executable)"
+```
+
+填写示例（目录仅作示例，请替换为自己电脑的实际路径）：
+
+```powershell
+$NodePath = 'C:\Program Files\nodejs\node.exe'
+$PythonPath = 'C:\Users\YourName\miniconda3\envs\zotero-pdf2zh-server\python.exe'
+$BackendPath = 'D:\Tools\zotero-pdf2zh\server'
+$DataDir = Join-Path $PSScriptRoot '.local-data'
+```
+
+保留英文单引号，路径含空格也可以；Windows 反斜杠不需要重复。资源管理器的“复制文件地址”可能带双引号，粘贴到单引号之间前应去掉那一对双引号。路径含中文时，将配置保存为 **UTF-8 with BOM**（或记事本的“带 BOM 的 UTF-8”），兼容 Windows PowerShell 5.1。
+
+`$DataDir` 是数据目录，保持默认即可，不算需要查找的安装路径。它会使用项目下的 `.local-data`，保存登录、密钥、设置与日志。若改成其他目录，应使用 AppData 和云同步目录之外的绝对路径，并避免提交到 Git。
+
+保存后，双击 `安装并启动.vbs` 会读取并验证配置；也可以在 Git、Node/npm 已可用的 PowerShell 中依次执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
+```
+
+安装器会检查选定的 Python 能否加载后端模块。若提示缺少依赖，请选回原来能启动后端的 Python 环境。已测试的后端组合为 Zotero 10、PDF2zh 插件 4.1.7、后端 4.0.4、pdf2zh_next；其他版本兼容性未验证。
 
 ## 使用
 
@@ -88,6 +137,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\stop.ps1
 
 ```powershell
 node --test adapter.test.mjs data-dir.test.mjs vendor/sign-in-with-chatgpt-devkit/packages/local/test/responses.test.mjs
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install-paths.test.ps1
 ```
 
 后端停止保护的测试使用配置中的 Python 环境（需 Flask）：
