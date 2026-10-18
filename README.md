@@ -15,6 +15,10 @@
 - 网页显示论文总体进度，以及正文翻译、排版、字体处理和保存等阶段的百分比。
 - 支持普通翻译、双语对照、裁剪和裁剪对照入口的任务状态与完成记录；裁剪等未报告细分百分比的操作显示阶段名称。
 
+## 界面预览
+
+<img src="docs/images/interface-preview.png" alt="ChatGPT PDF2zh 连接页面：模型与推理强度设置、论文完成进度和停止服务按钮" width="720">
+
 ## 安装
 
 需要 Windows、Git、Node.js >= 22.12（含 npm），以及已经安装好的 Zotero PDF2zh 后端与 Python/Conda 环境。已测试 Zotero 10、PDF2zh 插件 4.1.7、后端 4.0.4，翻译引擎为 pdf2zh_next。其他版本兼容性未验证。

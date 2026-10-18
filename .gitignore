@@ -11,6 +11,7 @@ account/
 __pycache__/
 *.pdf
 *.png
+!docs/images/interface-preview.png
 output/
 tmp/
 .local-data/
