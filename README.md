@@ -75,6 +75,6 @@ node --test adapter.test.mjs vendor/sign-in-with-chatgpt-devkit/packages/local/t
 
 SDK 来源：<https://github.com/openai/sign-in-with-chatgpt-devkit>，固定提交 `0a36fefeb913055c8c7a1a29b63d82b96b2e841a`。
 
-SDK 补丁保留 `response.completed` 的 usage 数据，并添加 reasoning effort 参数及对应测试。修改文件内包含变更声明。SDK 及这些修改受 [Sign-in with ChatGPT DevKit Noncommercial License](patches/SDK-LICENSE.txt) 约束，仅限该许可定义的非商业用途；不能将整套项目当作不受限制的 MIT 软件。上游依赖的许可见其仓库。本仓库独立桥接代码暂未另行授予开源许可证。
+SDK 补丁保留 `response.completed` 的 usage 数据，并添加 reasoning effort 参数及对应测试。修改文件内包含变更声明。SDK 及这些修改受 [Sign-in with ChatGPT DevKit Noncommercial License](patches/SDK-LICENSE.txt) 约束，仅限该许可定义的非商业用途；不能将整套项目当作不受限制的 MIT 软件。上游依赖的许可见其仓库。
 
-Zotero PDF2zh 上游：<https://github.com/guaguastandup/zotero-pdf2zh>。后端与翻译引擎不在本仓库分发，使用时应遵守各自许可。
+Zotero PDF2zh 上游：<https://github.com/guaguastandup/zotero-pdf2zh>。
